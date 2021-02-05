@@ -104,7 +104,7 @@ describe('Upload', () => {
 
       it('rejects with the error', async () => {
         const upload = new Upload(file, options)
-        let error
+        let error = null
         await upload.start().catch(e => (error = e))
         expect(error).toEqual('Failed')
       })
@@ -115,6 +115,53 @@ describe('Upload', () => {
         expect(options.onChangeFile).toHaveBeenCalledWith({
           id: { state: 'error', id: 'id', file, error: 'Failed' },
         })
+      })
+    })
+
+    describe('if the resouce is locked', () => {
+      jest.resetModules().doMock('activestorage', () => {
+        return {
+          DirectUpload: jest.fn(file => ({
+            id: 'id',
+            file,
+            create(cb) {
+              if(this.secondTime == null) {
+                this.secondTime = true
+                cb('Error storing "file.txt". Status: 423') // eslint-disable-line standard/no-callback-literal
+              } else {
+                cb(null, { signed_id: 'signedId' })
+              }
+            },
+          })),
+        }
+      })
+      const Upload = require('./Upload').default
+
+      it('retries the error', async () => {
+        const upload = new Upload(file, options)
+        expect(await upload.start()).toEqual('signedId')
+      })
+    })
+
+    describe('resource is too large', () => {
+      jest.resetModules().doMock('activestorage', () => {
+        return {
+          DirectUpload: jest.fn(file => ({
+            id: 'id',
+            file,
+            create(cb) {
+              cb('Error storing "file.txt". Status: 413') // eslint-disable-line standard/no-callback-literal
+            },
+          })),
+        }
+      })
+      const Upload = require('./Upload').default
+
+      it('retries the error', async () => {
+        const upload = new Upload(file, options)
+        let error = null
+        await upload.start().catch(e => (error = e))
+        expect(error).toEqual("Error storing \"file.txt\". Would exceed Account Storage Capacity")
       })
     })
   })
