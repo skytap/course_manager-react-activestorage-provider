@@ -109,7 +109,7 @@ class Upload {
           reject(_error);
         } else if (error.includes('Status: 423')) {
           // Advisory Lock blocked this call, we need to try again
-          setTimeout(() => { this.upload(resolve, reject) }, 20 + Math.floor(Math.random() * 101));
+          setTimeout(() => { this.upload(resolve, reject) }, 500 + Math.floor(Math.random() * 1501));
         } else {
           reject(error);
         }
