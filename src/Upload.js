@@ -91,7 +91,7 @@ class Upload {
       file: this.directUpload.file,
       error,
     })
-    throw error
+    return error // Not Throwing, because we can allow some of the files to upload.
   }
 
   start(): Promise<string> {
@@ -105,13 +105,13 @@ class Upload {
         error = error.replace('creating Blob for', 'uploading')
         if (error.includes('Status: 413')) {
           // File would exceed Storage Size
-          let _error = error.replace('Status: 413', 'Would exceed Account Storage Capacity')
-          reject(_error);
+          let _error = error.replace('Status: 413', `This file's size (${Math.round(this.directUpload.file.size / (1024 * 1024))}MB) would exceed your account's storage quota.`)
+          reject(new Error(_error));
         } else if (error.includes('Status: 423')) {
           // Advisory Lock blocked this call, we need to try again
           setTimeout(() => { this.upload(resolve, reject) }, 500 + Math.floor(Math.random() * 1501));
         } else {
-          reject(error);
+          reject(new Error(error));
         }
       } else {
         resolve(attributes.signed_id)
