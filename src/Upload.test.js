@@ -104,16 +104,15 @@ describe('Upload', () => {
 
       it('rejects with the error', async () => {
         const upload = new Upload(file, options)
-        let error = null
-        await upload.start().catch(e => (error = e))
-        expect(error).toEqual('Failed')
+        let error = await upload.start()
+        expect(error.message).toEqual('Failed')
       })
 
       it('reports an error', async () => {
         const upload = new Upload(file, options)
         await upload.start().catch(() => {})
         expect(options.onChangeFile).toHaveBeenCalledWith({
-          id: { state: 'error', id: 'id', file, error: 'Failed' },
+          id: { state: 'error', id: 'id', file, error: new Error('Failed') },
         })
       })
     })
@@ -143,6 +142,36 @@ describe('Upload', () => {
       })
     })
 
+    describe('if the resouce is rate limited', () => {
+      jest.resetModules().doMock('activestorage', () => {
+        return {
+          DirectUpload: jest.fn(file => ({
+            id: 'id',
+            file,
+            create(cb) {
+              if(this.secondTime == null) {
+                this.secondTime = true
+                cb('Error storing "file.txt". Status: 429') // eslint-disable-line standard/no-callback-literal
+              } else {
+                cb(null, { signed_id: 'signedId' })
+              }
+            },
+          })),
+        }
+      })
+      const Upload = require('./Upload').default
+
+      it('retries the error', async () => {
+        jest.useFakeTimers();
+        const upload = new Upload(file, options)
+        let promise = upload.start()
+        expect(setTimeout).toHaveBeenCalledTimes(1);
+        expect(setTimeout).toHaveBeenLastCalledWith(expect.any(Function), 10000);
+        jest.runAllTimers();
+        expect(await promise).toEqual('signedId')
+      })
+    })
+
     describe('resource is too large', () => {
       jest.resetModules().doMock('activestorage', () => {
         return {
@@ -159,9 +188,8 @@ describe('Upload', () => {
 
       it('retries the error', async () => {
         const upload = new Upload(file, options)
-        let error = null
-        await upload.start().catch(e => (error = e))
-        expect(error).toEqual("Error storing \"file.txt\". Would exceed Account Storage Capacity")
+        let error = await upload.start()
+        expect(error.message).toEqual("Error storing \"file.txt\". This file's size (0MB) would exceed your account's storage quota.")
       })
     })
   })

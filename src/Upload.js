@@ -110,6 +110,9 @@ class Upload {
         } else if (error.includes('Status: 423')) {
           // Advisory Lock blocked this call, we need to try again
           setTimeout(() => { this.upload(resolve, reject) }, 500 + Math.floor(Math.random() * 1501));
+        } else if (error.includes('Status: 429')) {
+          // Rate Limiting blocked this call, we need to try again. 10 Second wait time.
+          setTimeout(() => { this.upload(resolve, reject) }, 10000);
         } else {
           reject(new Error(error));
         }

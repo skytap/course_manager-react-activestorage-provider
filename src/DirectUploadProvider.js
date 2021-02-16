@@ -100,7 +100,8 @@ class DirectUploadProvider extends React.Component<Props, State> {
       }
     })
 
-    this.props.onError(errors)
+    if (this.props.onError)
+      this.props.onError(errors)
     this.props.onSuccess(signedIds)
     this.uploads = []
     this.setState({ fileUploads: {}, uploading: false })
