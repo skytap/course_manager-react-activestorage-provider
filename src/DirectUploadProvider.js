@@ -39,6 +39,7 @@ type Props = {
   ...DelegatedProps,
   origin: Origin,
   onSuccess: (string[]) => mixed,
+  onError?: (string[]) => mixed,
   headers?: CustomHeaders,
 }
 
@@ -87,10 +88,20 @@ class DirectUploadProvider extends React.Component<Props, State> {
 
     this.setState({ uploading: true })
 
-    const signedIds = await Promise.all(
-      this.uploads.map(upload => upload.start())
-    )
+    let results = await Promise.all(this.uploads.map(upload => upload.start()))
 
+    const errors = [];
+    const signedIds = [];
+    results.forEach(result => {
+      if (typeof result === 'string') {
+        signedIds.push(result)
+      } else {
+        errors.push(result)
+      }
+    })
+
+    if (this.props.onError)
+      this.props.onError(errors)
     this.props.onSuccess(signedIds)
     this.uploads = []
     this.setState({ fileUploads: {}, uploading: false })

@@ -91,18 +91,35 @@ class Upload {
       file: this.directUpload.file,
       error,
     })
-    throw error
+    return error // Not Throwing, because we can allow some of the files to upload.
   }
 
   start(): Promise<string> {
-    const promise = new Promise((resolve, reject) => {
-      this.directUpload.create((error, attributes) => {
-        if (error) reject(error)
-        else resolve(attributes.signed_id)
-      })
-    })
-
+    const promise = new Promise((resolve, reject) => this.upload(resolve, reject))
     return promise.then(this.handleSuccess).catch(this.handleError)
+  }
+
+  upload(resolve, reject): void {
+    this.directUpload.create((error, attributes) => {
+      if (error) {
+        error = error.replace('creating Blob for', 'uploading')
+        if (error.includes('Status: 413')) {
+          // File would exceed Storage Size
+          let _error = error.replace('Status: 413', `This file's size (${Math.round(this.directUpload.file.size / (1024 * 1024))}MB) would exceed your account's storage quota.`)
+          reject(new Error(_error));
+        } else if (error.includes('Status: 423')) {
+          // Advisory Lock blocked this call, we need to try again
+          setTimeout(() => { this.upload(resolve, reject) }, 500 + Math.floor(Math.random() * 1501));
+        } else if (error.includes('Status: 429')) {
+          // Rate Limiting blocked this call, we need to try again. 10 Second wait time.
+          setTimeout(() => { this.upload(resolve, reject) }, 10000);
+        } else {
+          reject(new Error(error));
+        }
+      } else {
+        resolve(attributes.signed_id)
+      }
+    })
   }
 
   /**
