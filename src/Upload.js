@@ -107,6 +107,9 @@ class Upload {
           // File would exceed Storage Size
           let _error = error.replace('Status: 413', `This file's size (${Math.round(this.directUpload.file.size / (1024 * 1024))}MB) would exceed your account's storage quota.`)
           reject(new Error(_error));
+        } else if (error.includes('Status: 415')) {
+          // File content type not allowed. (In our use case this is Video)
+          reject(new Error(error.replace('Status: 415', `Uploading video files is not supported.`)));
         } else if (error.includes('Status: 423')) {
           // Advisory Lock blocked this call, we need to try again
           setTimeout(() => { this.upload(resolve, reject) }, 500 + Math.floor(Math.random() * 1501));
